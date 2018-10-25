@@ -2,6 +2,7 @@
 
 import argparse
 
+#S-box
 substitutionDictionary = {
             "0000" : "1001",
             "0001" : "0100",
@@ -21,6 +22,7 @@ substitutionDictionary = {
             "1111" : "0111"
         }
 
+#inverse S-box
 inverseSubstitutionDictionary = {
             "1001" : "0000",
             "0100" : "0001",
@@ -41,6 +43,9 @@ inverseSubstitutionDictionary = {
         }
 
 def substituteNibbles(plaintextMat, inverse = False):
+    """
+        Substitues nibbles depending on encryption and decryption. Uses S-box for encryption and inverse S-box for decryption.
+    """
     substitutedMat = list()
     for l in plaintextMat:
         temp = list()
@@ -54,10 +59,17 @@ def substituteNibbles(plaintextMat, inverse = False):
     return substitutedMat
 
 def shiftRows(plaintextMat):
+    """
+        1 byte left circular shift of row-1.
+    """
     plaintextMat[1].reverse()
     return plaintextMat
 
 def mixColumns(plaintextMat, inverse = False):
+    """
+        Multiplies plaintextMat by [[1, 4], [4, 1]] for encryption and [[9, 2], [2, 9]] for decryption. 
+        Both multiplication are in GF(16). Uses lookup tables for multiplication by 2, 4 and 9.
+    """
     lookupTable = {
             "0000" : 0,
             "0001" : 4,
@@ -141,12 +153,18 @@ def mixColumns(plaintextMat, inverse = False):
     return mixedColumns
 
 def addRoundKey(plaintext, key):
+    """
+        plaintext XOR key
+    """
     return [
             [str(format((int(str(plaintext[0][0]), 2) ^ int(str(key[0][0]), 2)), "08b")[4:8]), str(format((int(str(plaintext[0][1]), 2) ^ int(str(key[0][1]), 2)), "08b")[4:8])],
             [str(format((int(str(plaintext[1][0]), 2) ^ int(str(key[1][0]), 2)), "08b")[4:8]), str(format((int(str(plaintext[1][1]), 2) ^ int(str(key[1][1]), 2)), "08b")[4:8])]
         ]
 
 def expandKey(key, roundNumber):
+    """
+        Expands key using key expansion algorithm of S-AES.
+    """
     key0 = int(key[0][0] + key[1][0], 2)
     key1 = int(key[0][1] + key[1][1], 2)
     #Nibble substitution of the reverse of the second key
@@ -171,18 +189,28 @@ def expandKey(key, roundNumber):
         ]
 
 def getTextFromMatrix(matrix):
+    """
+        Convert matrix to text.
+    """
     return chr(int(matrix[0][0] + matrix[1][0], 2)) + chr(int(matrix[0][1] + matrix[1][1], 2))
 
 def createMatrix(text):
+    """ 
+        Convert text to matrix.
+    """
     return [
             [str(format(ord(text[0]), '08b')[0:4]), str(format(ord(text[1]), '08b')[0:4])],
             [str(format(ord(text[0]), '08b')[4:8]), str(format(ord(text[1]), '08b')[4:8])]
         ]
 
 def encrypt(plaintext, key):
+    """
+        S-AES Encryption.
+    """
     ciphertext = ""
     plaintextLength = len(plaintext)
     
+    # Key expansion for both the rounds
     keyMat = createMatrix(key)
     keyMat1 = expandKey(keyMat, 1)
     keyMat2 = expandKey(keyMat1, 2)
@@ -196,12 +224,14 @@ def encrypt(plaintext, key):
         i += 2
 
         plaintextMat = addRoundKey(plaintextMat, keyMat)
-        #print(plaintextMat)
+        
+        #Round 1
         plaintextMat = substituteNibbles(plaintextMat)
         plaintextMat = shiftRows(plaintextMat)
         plaintextMat = mixColumns(plaintextMat)
         plaintextMat = addRoundKey(plaintextMat, keyMat1)
 
+        #Round 2
         plaintextMat = substituteNibbles(plaintextMat)
         plaintextMat = shiftRows(plaintextMat)
         plaintextMat = addRoundKey(plaintextMat, keyMat2)
@@ -210,9 +240,13 @@ def encrypt(plaintext, key):
     return ciphertext
 
 def decrypt(ciphertext, key):
+    """
+        S-AES Decryption
+    """
     plaintext = ""
     ciphertextLength = len(ciphertext)
     
+    #Key Expansion for both the rounds
     keyMat = createMatrix(key)
     keyMat1 = expandKey(keyMat, 1)
     keyMat2 = expandKey(keyMat1, 2)
@@ -227,11 +261,13 @@ def decrypt(ciphertext, key):
 
         ciphertextMat = addRoundKey(ciphertextMat, keyMat2)
         
+        #Round 1
         ciphertextMat = shiftRows(ciphertextMat)
         ciphertextMat = substituteNibbles(ciphertextMat, inverse = True)
         ciphertextMat = addRoundKey(ciphertextMat, keyMat1)
         ciphertextMat = mixColumns(ciphertextMat, inverse = True)
 
+        #Round 2
         ciphertextMat = shiftRows(ciphertextMat)
         ciphertextMat = substituteNibbles(ciphertextMat, inverse = True)
         ciphertextMat = addRoundKey(ciphertextMat, keyMat)
@@ -240,6 +276,9 @@ def decrypt(ciphertext, key):
     return plaintext
     
 def openFile(filename, mode):
+    """
+        Opens file in given mode. Also checks for errors.
+    """
     try:
         f = open(filename, mode)
         return f
